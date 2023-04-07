@@ -1,4 +1,4 @@
-package cn.itcast.hotel.model.pojo;
+package cn.itcast.hotel.pojo;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

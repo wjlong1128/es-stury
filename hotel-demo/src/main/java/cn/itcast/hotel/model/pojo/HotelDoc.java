@@ -1,7 +1,11 @@
 package cn.itcast.hotel.model.pojo;
 
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -19,6 +23,8 @@ public class HotelDoc {
     private String pic;
     private Object distance;
     private Boolean isAD;
+    // 对应es的自动补全
+    private List<String> suggestion;
 
     public HotelDoc(Hotel hotel) {
         this.id = hotel.getId();
@@ -32,5 +38,16 @@ public class HotelDoc {
         this.business = hotel.getBusiness();
         this.location = hotel.getLatitude() + ", " + hotel.getLongitude();
         this.pic = hotel.getPic();
+        this.suggestion = new ArrayList<>();
+        if (!StringUtils.isBlank(business)){
+            this.suggestion.add(brand);
+            if (business.contains("/")){
+                for (String s : business.split("/")) {
+                    this.suggestion.add(s);
+                }
+            }else{
+                this.suggestion.add(business);
+            }
+        }
     }
 }

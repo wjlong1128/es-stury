@@ -49,7 +49,8 @@ public class HotelIndexTest {
     @Test
     void createIndex() {
         CreateIndexRequest request = new CreateIndexRequest(HotelConst.HOTEL_INDEX);
-        request.source(HotelConst.MAPPING, XContentType.JSON);
+        // request.source(HotelConst.MAPPING, XContentType.JSON);
+        request.source(HotelConst.HOTEL_MAPPING_WITH_PINYIN_IK_SETTING,XContentType.JSON);
         CreateIndexResponse response = client.indices().create(request, RequestOptions.DEFAULT);
         System.out.println(response.isAcknowledged());
     }
@@ -59,6 +60,7 @@ public class HotelIndexTest {
      */
     @Test
     void indexExists() throws IOException {
+        // GetIndexRequest request = new GetIndexRequest(HotelConst.HOTEL_INDEX);
         GetIndexRequest request = new GetIndexRequest(HotelConst.HOTEL_INDEX);
         boolean exists = client.indices().exists(request, RequestOptions.DEFAULT);
         System.out.println(exists);

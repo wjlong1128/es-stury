@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 /*
  * @author Wang Jianlong
@@ -29,9 +31,9 @@ public class HotelController {
         return service.search(params);
     }
 
-    //@RequestMapping("filters")
-    //public PageResult<HotelDoc> filters(@RequestBody QueryParams params) throws IOException {
-    //   return service.search(params);
-    //}
+    @RequestMapping("filters")
+    public Map<String,List<String>> filters(@RequestBody QueryParams params) throws IOException {
+       return service.filters(params);
+    }
 
 }

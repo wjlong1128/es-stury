@@ -7,6 +7,7 @@ import com.wjl.hotel3.model.result.PageResult;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface IHotelService {
@@ -15,4 +16,6 @@ public interface IHotelService {
    List<HotelDoc> list();
 
     PageResult<HotelDoc> search(QueryParams params) throws IOException;
+
+    Map<String, List<String>> filters(QueryParams params) throws IOException;
 }

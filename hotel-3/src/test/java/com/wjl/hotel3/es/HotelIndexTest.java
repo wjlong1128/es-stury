@@ -1,10 +1,7 @@
 package com.wjl.hotel3.es;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import co.elastic.clients.elasticsearch._types.mapping.IntegerNumberProperty;
-import co.elastic.clients.elasticsearch._types.mapping.KeywordProperty;
-import co.elastic.clients.elasticsearch._types.mapping.Property;
-import co.elastic.clients.elasticsearch._types.mapping.TextProperty;
+import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.elasticsearch.indices.CreateIndexResponse;
 import co.elastic.clients.elasticsearch.indices.DeleteIndexResponse;
 import co.elastic.clients.transport.endpoints.BooleanResponse;
@@ -14,9 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 /*
  * @author Wang Jianlong
@@ -34,12 +31,13 @@ public class HotelIndexTest {
      * 创建索引库
      * PUT /hotel
      * {
-     *     "mappings":{}
+     * "mappings":{}
      * }
      */
     @SneakyThrows
     @Test
     void createIndex() throws IOException {
+        /*
         Map<String, Property> propertyMap = new HashMap<>();
         propertyMap.put("id",Property.of(p -> p.keyword(KeywordProperty.of(k -> k.index(true)))));
         propertyMap.put("name",Property.of(p -> p.text(TextProperty.of(t -> t.index(true).analyzer("ik_max_word")))));
@@ -56,6 +54,15 @@ public class HotelIndexTest {
         CreateIndexResponse response = client.indices().create(c -> c.index(HotelConst.HOTEL_INDEX).mappings(m -> m.properties(propertyMap)));
         // CreateIndexResponse: {"index":"hotel","shards_acknowledged":true,"acknowledged":true}
         System.out.println(response);
+         */
+        // 方式2 基于json流创建
+        CreateIndexRequest.Builder builder = new CreateIndexRequest.Builder();
+        ByteArrayInputStream sbis = new ByteArrayInputStream(HotelConst.MAPPING_WITH_SUGG.getBytes(StandardCharsets.UTF_8));
+        // TODO: 这里无法创建索引库 可能是8版本的自定义分词器
+        builder.index(HotelConst.HOTEL_INDEX).withJson(sbis);
+        CreateIndexResponse response = client.indices().create(builder.build());
+        System.out.println(response);
+        sbis.close();
     }
 
 
@@ -78,7 +85,6 @@ public class HotelIndexTest {
         DeleteIndexResponse response = client.indices().delete(d -> d.index(HotelConst.HOTEL_INDEX));
         System.out.println(response.acknowledged());
     }
-
 
 
 }

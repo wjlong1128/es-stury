@@ -2,6 +2,8 @@ package com.wjl.hotel3.service.impl;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.*;
+import co.elastic.clients.elasticsearch._types.aggregations.StringTermsAggregate;
+import co.elastic.clients.elasticsearch._types.aggregations.StringTermsBucket;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
@@ -23,8 +25,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.wjl.hotel3.consts.HotelConst.HOTEL_INDEX;
@@ -49,50 +50,11 @@ public class HotelService implements IHotelService {
 
     @Override
     public PageResult<HotelDoc> search(QueryParams params) throws IOException {
-        String city = params.getCity();
-        String key = params.getKey();
         Integer page = params.getPage();
         Integer size = params.getSize();
-        String brand = params.getBrand();
-        String starName = params.getStarName();
-        Integer maxPrice = params.getMaxPrice();
-        Integer minPrice = params.getMinPrice();
-        String sortBy = params.getSortBy();
         String location = params.getLocation();
 
-        // 这里由于要组合条件 使用的是BuilderAPI 而不是惯用
-        Query basicQuery = null;
-        if (StringUtils.isBlank(key)) {
-            basicQuery = QueryBuilders.matchAll().build()._toQuery();
-        } else {
-            basicQuery = QueryBuilders.match(v -> v.field("all").query(key));
-        }
-
-        BoolQuery.Builder boolQueryBuilder = QueryBuilders
-                .bool()
-                .must(basicQuery);
-        if (!StringUtils.isBlank(city)) {
-            boolQueryBuilder.filter(r -> r.term(fn -> fn.field("city").value(city)));
-        }
-        if (!StringUtils.isBlank(brand)) {
-            boolQueryBuilder.filter(f -> f.term(fn -> fn.field("brand").value(brand)));
-        }
-        if (!StringUtils.isBlank(starName)) {
-            boolQueryBuilder.filter(f -> f.term(fn -> fn.field("starName").value(starName)));
-        }
-        if (!ObjectUtils.isEmpty(minPrice) && !ObjectUtils.isEmpty(maxPrice)) {
-            boolQueryBuilder.filter(fn -> fn.range(f -> f.field("price").lte(JsonData.of(maxPrice)).gte(JsonData.of(minPrice))));
-        }
-
-        Query boolQuery = boolQueryBuilder.build()._toQuery();
-
-        // 函数算分查询 将标记广告的记录移动到前面
-        Query query = QueryBuilders.functionScore(
-                // 基础查询
-                q -> q.query(boolQuery)
-                        .functions(fn -> fn.filter(f -> f.term(t -> t.field("isAD").value(true))).weight(10D))
-                        .scoreMode(FunctionScoreMode.Multiply)
-        );
+        Query query = builderQuery(params);
         SearchRequest.Builder builder = new SearchRequest.Builder()
                 .index(HOTEL_INDEX)
                 .query(query)
@@ -130,4 +92,82 @@ public class HotelService implements IHotelService {
         result.setHotels(docList);
         return result;
     }
+
+    @Override
+    public Map<String, List<String>> filters(QueryParams params) throws IOException {
+        Query query = builderQuery(params);
+        SearchRequest request = new SearchRequest.Builder()
+                .index(HOTEL_INDEX)
+                .query(query)
+                .size(0)
+                .aggregations("brandAgg",fn -> fn.terms( t -> t.field("brand").size(100)))
+                .aggregations("starAgg",fn -> fn.terms( t -> t.field("starName").size(100)))
+                .aggregations("cityAgg",fn -> fn.terms( t -> t.field("city").size(100)))
+                .build();
+        SearchResponse<HotelDoc> response = client.search(request, HotelDoc.class);
+        HashMap<String, List<String>> aggMap = new HashMap<>();
+        List<String> brandAgg = getAggListByName(response,"brandAgg");
+        aggMap.put("brand",brandAgg);
+        List<String> starAgg = getAggListByName(response,"starAgg");
+        aggMap.put("starName",starAgg);
+        List<String>  cityAgg = getAggListByName(response,"cityAgg");
+        aggMap.put("city",cityAgg);
+        return aggMap;
+    }
+
+    private List<String> getAggListByName(SearchResponse<HotelDoc> response, String aggName) {
+        ArrayList<String> result = new ArrayList<>();
+        StringTermsAggregate sterms = response.aggregations().get(aggName).sterms();
+        for (StringTermsBucket bucket : sterms.buckets().array()) {
+            String key = bucket.key().stringValue();
+            result.add(key);
+        }
+        return result;
+    }
+
+    private Query builderQuery(QueryParams params) {
+        String city = params.getCity();
+        String key = params.getKey();
+        String brand = params.getBrand();
+        String starName = params.getStarName();
+        Integer maxPrice = params.getMaxPrice();
+        Integer minPrice = params.getMinPrice();
+        String sortBy = params.getSortBy();
+
+        // 这里由于要组合条件 使用的是BuilderAPI 而不是惯用
+        Query basicQuery = null;
+        if (StringUtils.isBlank(key)) {
+            basicQuery = QueryBuilders.matchAll().build()._toQuery();
+        } else {
+            basicQuery = QueryBuilders.match(v -> v.field("all").query(key));
+        }
+
+        BoolQuery.Builder boolQueryBuilder = QueryBuilders
+                .bool()
+                .must(basicQuery);
+        if (!StringUtils.isBlank(city)) {
+            boolQueryBuilder.filter(r -> r.term(fn -> fn.field("city").value(city)));
+        }
+        if (!StringUtils.isBlank(brand)) {
+            boolQueryBuilder.filter(f -> f.term(fn -> fn.field("brand").value(brand)));
+        }
+        if (!StringUtils.isBlank(starName)) {
+            boolQueryBuilder.filter(f -> f.term(fn -> fn.field("starName").value(starName)));
+        }
+        if (!ObjectUtils.isEmpty(minPrice) && !ObjectUtils.isEmpty(maxPrice)) {
+            boolQueryBuilder.filter(fn -> fn.range(f -> f.field("price").lte(JsonData.of(maxPrice)).gte(JsonData.of(minPrice))));
+        }
+
+        Query boolQuery = boolQueryBuilder.build()._toQuery();
+
+        // 函数算分查询 将标记广告的记录移动到前面
+        Query query = QueryBuilders.functionScore(
+                // 基础查询
+                q -> q.query(boolQuery)
+                        .functions(fn -> fn.filter(f -> f.term(t -> t.field("isAD").value(true))).weight(10D))
+                        .scoreMode(FunctionScoreMode.Multiply)
+        );
+        return query;
+    }
+
 }
